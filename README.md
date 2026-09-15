@@ -10,7 +10,7 @@
 | POST | `/api/paraphrase` | `{ "text": "...", "style": "neutral / formal / casual / simple / academic" }` | `{ "result": "...", "model": "..." }` |
 | GET | `/api/tts/voices` | — | `{ "voices": [...] }` |
 | GET | `/api/models` | — | список моделей, доступных ключу (диагностика) |
-| POST | `/api/tts` | `{ "text": "...", "voice": "Kore" }` | `audio/wav` |
+| POST | `/api/tts` | `{ "text": "...", "voice": "Kore", "model": "необязательно, TTS-модель" }` | `audio/wav` |
 
 Если задана переменная `APP_API_KEY`, все `/api/*` требуют заголовок `X-App-Key: <ключ>`.
 
