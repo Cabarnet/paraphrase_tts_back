@@ -9,5 +9,5 @@ if (!apiKey) {
 export const ai = new GoogleGenAI({ apiKey });
 
 // Модели можно переопределить через переменные окружения на Railway
-export const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
+export const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-3.6-flash';
 export const TTS_MODEL = process.env.GEMINI_TTS_MODEL || 'gemini-2.5-flash-preview-tts';

@@ -3,6 +3,7 @@ import cors from 'cors';
 import { requireAppKey } from './middleware/auth.js';
 import paraphraseRouter from './routes/paraphrase.js';
 import ttsRouter from './routes/tts.js';
+import modelsRouter from './routes/models.js';
 import { TEXT_MODEL, TTS_MODEL } from './gemini.js';
 
 const app = express();
@@ -18,6 +19,7 @@ app.get('/health', (_req, res) =>
 
 app.use('/api/paraphrase', requireAppKey, paraphraseRouter);
 app.use('/api/tts', requireAppKey, ttsRouter);
+app.use('/api/models', requireAppKey, modelsRouter);
 
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 
