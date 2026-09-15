@@ -1,0 +1,20 @@
+{
+  "name": "paraphrase-tts-back",
+  "version": "1.0.0",
+  "description": "Общий бэкенд для приложений перефразировки и озвучки текста (Google AI Studio / Gemini)",
+  "type": "module",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@google/genai": "^2.22.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1"
+  }
+}
