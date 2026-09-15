@@ -31,10 +31,11 @@ function pcmToWav(pcm, sampleRate = 24_000, channels = 1, bitsPerSample = 16) {
 // GET /api/tts/voices -> { voices: string[] }
 router.get('/voices', (_req, res) => res.json({ voices: VOICES }));
 
-// POST /api/tts  { text: string, voice?: string }
+// POST /api/tts  { text: string, voice?: string, model?: string }
+// model — необязательно, только TTS-модели (например gemini-3.1-flash-tts-preview)
 // -> audio/wav (бинарный файл)
 router.post('/', async (req, res) => {
-  const { text, voice = 'Kore' } = req.body ?? {};
+  const { text, voice = 'Kore', model = TTS_MODEL } = req.body ?? {};
 
   if (typeof text !== 'string' || !text.trim()) {
     return res.status(400).json({ error: 'Поле text обязательно' });
@@ -42,13 +43,16 @@ router.post('/', async (req, res) => {
   if (text.length > MAX_TEXT_LENGTH) {
     return res.status(413).json({ error: `Текст длиннее ${MAX_TEXT_LENGTH} символов` });
   }
+  if (typeof model !== 'string' || !model.includes('tts')) {
+    return res.status(400).json({ error: 'model должна быть TTS-моделью' });
+  }
   if (!VOICES.includes(voice)) {
     return res.status(400).json({ error: `Неизвестный voice. Доступны: ${VOICES.join(', ')}` });
   }
 
   try {
     const response = await ai.models.generateContent({
-      model: TTS_MODEL,
+      model,
       contents: text,
       config: {
         responseModalities: ['AUDIO'],
@@ -58,10 +62,21 @@ router.post('/', async (req, res) => {
       },
     });
 
-    const base64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64) {
-      return res.status(502).json({ error: 'Модель не вернула аудио' });
+    const candidate = response.candidates?.[0];
+    const audioPart = candidate?.content?.parts?.find((p) => p.inlineData?.data);
+    if (!audioPart) {
+      console.error('tts: no audio in response', JSON.stringify(response, null, 2));
+      return res.status(502).json({
+        error: 'Модель не вернула аудио',
+        details: {
+          model,
+          finishReason: candidate?.finishReason,
+          promptFeedback: response.promptFeedback,
+          text: response.text,
+        },
+      });
     }
+    const base64 = audioPart.inlineData.data;
 
     const wav = pcmToWav(Buffer.from(base64, 'base64'));
     res.set({
