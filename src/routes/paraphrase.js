@@ -49,11 +49,21 @@ router.post('/', async (req, res) => {
 
   try {
     const { result, model: usedModel } = await withModelFallback(models, async (m) => {
+      // Gemma не поддерживает systemInstruction — для неё инструкция уходит
+      // в само сообщение, иначе API отвечает 500 INTERNAL.
+      const isGemma = m.startsWith('gemma');
       const response = await withTimeout(
         ai.models.generateContent({
           model: m,
-          contents: text,
-          config: { systemInstruction, temperature: 0.7, httpOptions: { timeout: CALL_TIMEOUT_MS } },
+          contents: isGemma ? `${systemInstruction}
+
+Текст:
+${text}` : text,
+          config: {
+            ...(isGemma ? {} : { systemInstruction }),
+            temperature: 0.7,
+            httpOptions: { timeout: CALL_TIMEOUT_MS },
+          },
         }),
         CALL_TIMEOUT_MS,
       );
