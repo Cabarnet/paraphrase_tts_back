@@ -31,6 +31,11 @@ function statusOf(err) {
   return match ? Number(match[1]) : undefined;
 }
 
+/** 429 RESOURCE_EXHAUSTED: исчерпан лимит запросов в минуту для этой модели. */
+export function isQuotaError(err) {
+  return statusOf(err) === 429;
+}
+
 export function isRetryable(err) {
   const status = statusOf(err);
   // Без распознанного кода это, как правило, сетевой сбой — его тоже повторяем.
@@ -82,6 +87,9 @@ export async function withModelFallback(models, call, { baseDelayMs = 600 } = {}
         lastError = err;
         if (!isRetryable(err)) throw err;
         console.warn(`model ${model} attempt ${attempt + 1} failed: ${statusOf(err) ?? 'network'}`);
+        // Лимит запросов в минуту повтором не лечится и только усугубляется —
+        // сразу уходим на следующую модель, у неё своя квота.
+        if (isQuotaError(err)) break;
         if (Date.now() + baseDelayMs < deadline) await sleep(baseDelayMs);
       }
     }

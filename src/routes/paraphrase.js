@@ -7,6 +7,7 @@ import {
   isRetryable,
   CALL_TIMEOUT_MS,
   withTimeout,
+  isQuotaError,
 } from '../gemini.js';
 
 const router = Router();
@@ -72,13 +73,15 @@ router.post('/', async (req, res) => {
     console.error('paraphrase error:', err);
     // Перегрузка бесплатного тарифа — это 503, а не «наша» ошибка: так клиент
     // может предложить повторить, не показывая «сервис сломан».
-    const status = isRetryable(err) ? 503 : 502;
-    res.status(status).json({
-      error: status === 503
-        ? 'Модель сейчас перегружена. Попробуйте ещё раз через несколько секунд.'
-        : 'Ошибка при обращении к модели',
-      details: err.message,
-    });
+    // 429 отдаём как есть: клиент показывает «слишком много запросов»,
+    // а не «перегружена» — причина и совет пользователю разные.
+    const status = isQuotaError(err) ? 429 : isRetryable(err) ? 503 : 502;
+    const messages = {
+      429: 'Слишком много запросов. Подождите минуту и попробуйте снова.',
+      503: 'Модель сейчас перегружена. Попробуйте ещё раз через несколько секунд.',
+      502: 'Ошибка при обращении к модели',
+    };
+    res.status(status).json({ error: messages[status], details: err.message });
   }
 });
 
