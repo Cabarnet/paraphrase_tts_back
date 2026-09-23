@@ -6,6 +6,7 @@ import {
   withModelFallback,
   isRetryable,
   CALL_TIMEOUT_MS,
+  withTimeout,
 } from '../gemini.js';
 
 const router = Router();
@@ -47,11 +48,14 @@ router.post('/', async (req, res) => {
 
   try {
     const { result, model: usedModel } = await withModelFallback(models, async (m) => {
-      const response = await ai.models.generateContent({
-        model: m,
-        contents: text,
-        config: { systemInstruction, temperature: 0.7, httpOptions: { timeout: CALL_TIMEOUT_MS } },
-      });
+      const response = await withTimeout(
+        ai.models.generateContent({
+          model: m,
+          contents: text,
+          config: { systemInstruction, temperature: 0.7, httpOptions: { timeout: CALL_TIMEOUT_MS } },
+        }),
+        CALL_TIMEOUT_MS,
+      );
       const output = response.text?.trim();
       if (!output) {
         // Пустой ответ обычно означает срабатывание фильтра — повтор не поможет,

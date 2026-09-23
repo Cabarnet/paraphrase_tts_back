@@ -39,6 +39,22 @@ export function isRetryable(err) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Обрывает зависший вызов: httpOptions.timeout в SDK отрабатывает не всегда,
+ * а перегруженный Gemini способен держать соединение дольше минуты.
+ */
+export function withTimeout(promise, ms) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error(`Модель не ответила за ${ms} мс`);
+      error.status = 504;
+      reject(error);
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 /** Предел на один вызов модели: перегруженный Gemini может «думать» минуту. */
 export const CALL_TIMEOUT_MS = Number(process.env.GEMINI_CALL_TIMEOUT_MS || 20_000);
 
