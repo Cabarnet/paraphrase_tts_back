@@ -9,14 +9,15 @@ if (!apiKey) {
 export const ai = new GoogleGenAI({ apiKey });
 
 // Модели можно переопределить через переменные окружения на Railway.
-export const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-3.5-flash';
+export const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-3-flash-preview';
 export const TTS_MODEL = process.env.GEMINI_TTS_MODEL || 'gemini-3.1-flash-tts-preview';
 
-// Бесплатный тариф Gemini регулярно отвечает 503 «high demand». Когда основная
-// модель перегружена, пробуем запасные — список задаётся через GEMINI_TEXT_FALLBACKS
-// (через запятую) и проходится по порядку.
+// У каждой модели своя дневная квота бесплатного тарифа, и она невелика. Когда
+// основная модель перегружена (503) или её квота исчерпана (429), идём по списку
+// запасных — это и страховка от сбоя, и способ сложить квоты нескольких моделей.
+// Список задаётся через GEMINI_TEXT_FALLBACKS (через запятую).
 export const TEXT_FALLBACKS = (process.env.GEMINI_TEXT_FALLBACKS ||
-  'gemini-3.6-flash,gemini-3.5-flash-lite')
+  'gemini-3.5-flash,gemini-3.1-flash-lite,gemini-3.5-flash-lite,gemini-3.6-flash')
   .split(',')
   .map((m) => m.trim())
   .filter(Boolean);
