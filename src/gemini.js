@@ -64,6 +64,9 @@ export function withTimeout(promise, ms) {
 /** Предел на один вызов модели: перегруженный Gemini может «думать» минуту. */
 export const CALL_TIMEOUT_MS = Number(process.env.GEMINI_CALL_TIMEOUT_MS || 20_000);
 
+/** Меньше этого остатка бюджета начинать новую попытку бессмысленно. */
+const MIN_ATTEMPT_MS = 3_000;
+
 /** Общий бюджет на все попытки — клиент ждёт ответа не дольше минуты. */
 const TOTAL_BUDGET_MS = Number(process.env.GEMINI_TOTAL_BUDGET_MS || 45_000);
 
@@ -81,9 +84,12 @@ export async function withModelFallback(models, call, { baseDelayMs = 600 } = {}
     // держится дольше паузы, и время лучше потратить на другую модель.
     const attempts = index === 0 ? 2 : 1;
     for (let attempt = 0; attempt < attempts; attempt++) {
-      if (Date.now() >= deadline) throw lastError ?? new Error('Истёк бюджет времени на запрос');
+      // Попытке отводим не больше, чем осталось от общего бюджета: иначе
+      // последний вызов может выйти за таймаут клиента.
+      const budgetLeft = deadline - Date.now();
+      if (budgetLeft < MIN_ATTEMPT_MS) throw lastError ?? new Error('Истёк бюджет времени на запрос');
       try {
-        return { result: await call(model), model };
+        return { result: await call(model, Math.min(CALL_TIMEOUT_MS, budgetLeft)), model };
       } catch (err) {
         lastError = err;
         if (!isRetryable(err)) throw err;
