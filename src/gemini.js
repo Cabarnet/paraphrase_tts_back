@@ -39,22 +39,34 @@ export function isRetryable(err) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Предел на один вызов модели: перегруженный Gemini может «думать» минуту. */
+export const CALL_TIMEOUT_MS = Number(process.env.GEMINI_CALL_TIMEOUT_MS || 20_000);
+
+/** Общий бюджет на все попытки — клиент ждёт ответа не дольше минуты. */
+const TOTAL_BUDGET_MS = Number(process.env.GEMINI_TOTAL_BUDGET_MS || 45_000);
+
 /**
- * Выполняет `call(model)` по очереди для каждой модели из списка, повторяя
- * попытки с экспоненциальной задержкой. Возвращает результат первой успешной.
+ * Выполняет `call(model)` по очереди для каждой модели из списка: основную
+ * пробуем дважды, запасные — по разу, и всё это в пределах общего бюджета
+ * времени. Возвращает результат первой успешной попытки.
  */
-export async function withModelFallback(models, call, { attemptsPerModel = 2, baseDelayMs = 700 } = {}) {
+export async function withModelFallback(models, call, { baseDelayMs = 600 } = {}) {
+  const deadline = Date.now() + TOTAL_BUDGET_MS;
   let lastError;
-  for (const model of models) {
-    for (let attempt = 0; attempt < attemptsPerModel; attempt++) {
+
+  for (const [index, model] of models.entries()) {
+    // Вторая попытка есть только у основной модели: перегрузка обычно
+    // держится дольше паузы, и время лучше потратить на другую модель.
+    const attempts = index === 0 ? 2 : 1;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      if (Date.now() >= deadline) throw lastError ?? new Error('Истёк бюджет времени на запрос');
       try {
         return { result: await call(model), model };
       } catch (err) {
         lastError = err;
         if (!isRetryable(err)) throw err;
         console.warn(`model ${model} attempt ${attempt + 1} failed: ${statusOf(err) ?? 'network'}`);
-        const isLastTry = attempt === attemptsPerModel - 1 && model === models[models.length - 1];
-        if (!isLastTry) await sleep(baseDelayMs * 2 ** attempt);
+        if (Date.now() + baseDelayMs < deadline) await sleep(baseDelayMs);
       }
     }
   }

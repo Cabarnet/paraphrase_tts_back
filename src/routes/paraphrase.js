@@ -1,5 +1,12 @@
 import { Router } from 'express';
-import { ai, TEXT_MODEL, TEXT_FALLBACKS, withModelFallback, isRetryable } from '../gemini.js';
+import {
+  ai,
+  TEXT_MODEL,
+  TEXT_FALLBACKS,
+  withModelFallback,
+  isRetryable,
+  CALL_TIMEOUT_MS,
+} from '../gemini.js';
 
 const router = Router();
 
@@ -43,7 +50,7 @@ router.post('/', async (req, res) => {
       const response = await ai.models.generateContent({
         model: m,
         contents: text,
-        config: { systemInstruction, temperature: 0.7 },
+        config: { systemInstruction, temperature: 0.7, httpOptions: { timeout: CALL_TIMEOUT_MS } },
       });
       const output = response.text?.trim();
       if (!output) {
