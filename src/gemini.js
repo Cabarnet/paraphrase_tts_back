@@ -1,12 +1,16 @@
 import { GoogleGenAI } from '@google/genai';
 
 const apiKey = process.env.GEMINI_API_KEY;
+
+/** Без ключа Gemini недоступен: перефразировка не работает, озвучка — да,
+ *  если настроен Google Cloud TTS. Поэтому не падаем, а отключаем провайдер. */
+export const GEMINI_ENABLED = Boolean(apiKey);
+
 if (!apiKey) {
-  console.error('GEMINI_API_KEY не задан. Получить ключ: https://aistudio.google.com/apikey');
-  process.exit(1);
+  console.warn('GEMINI_API_KEY не задан — перефразировка отключена.');
 }
 
-export const ai = new GoogleGenAI({ apiKey });
+export const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // Модели можно переопределить через переменные окружения на Railway.
 export const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-3-flash-preview';

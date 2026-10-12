@@ -30,6 +30,10 @@ const GROQ_PREFIX = 'groq:';
 router.post('/', async (req, res) => {
   const { text, style = 'neutral', model } = req.body ?? {};
 
+  if (!GEMINI_ENABLED) {
+    return res.status(503).json({ error: 'Перефразировка временно недоступна' });
+  }
+
   if (typeof text !== 'string' || !text.trim()) {
     return res.status(400).json({ error: 'Поле text обязательно' });
   }

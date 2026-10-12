@@ -5,6 +5,7 @@ import paraphraseRouter from './routes/paraphrase.js';
 import ttsRouter from './routes/tts.js';
 import modelsRouter from './routes/models.js';
 import { TEXT_MODEL, TTS_MODEL } from './gemini.js';
+import { CLOUD_TTS_ENABLED } from './cloud-tts.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000; // Railway передаёт PORT сам
@@ -14,7 +15,12 @@ app.use(express.json({ limit: '1mb' }));
 
 // Health-check для Railway и мониторинга
 app.get('/health', (_req, res) =>
-  res.json({ status: 'ok', textModel: TEXT_MODEL, ttsModel: TTS_MODEL }),
+  res.json({
+    status: 'ok',
+    textModel: TEXT_MODEL,
+    tts: CLOUD_TTS_ENABLED ? 'google-cloud' : 'gemini',
+    ttsFallbackModel: TTS_MODEL,
+  }),
 );
 
 app.use('/api/paraphrase', requireAppKey, paraphraseRouter);

@@ -1,20 +1,45 @@
 # paraphrase-tts-back
 
-Общий бэкенд для приложений «Перефразировка» и «Озвучка текста». Работает поверх Google AI Studio (Gemini).
+Общий бэкенд для приложений «Перефразировка» и «Озвучка текста». Перефразировка
+работает поверх Google AI Studio (Gemini) и Groq, озвучка — поверх Google Cloud
+Text-to-Speech.
 
 ## Эндпоинты
 
 | Метод | Путь | Тело | Ответ |
 |---|---|---|---|
-| GET | `/health` | — | `{ status, textModel, ttsModel }` |
+| GET | `/health` | — | `{ status, textModel, tts, ttsFallbackModel }` |
 | POST | `/api/paraphrase` | `{ "text": "...", "style": "neutral / formal / casual / simple / academic" }` | `{ "result": "...", "model": "..." }` |
 | GET | `/api/tts/voices` | — | `{ "voices": [...] }` |
 | GET | `/api/models` | — | список моделей, доступных ключу (диагностика) |
-| POST | `/api/tts` | `{ "text": "...", "voice": "Kore", "model": "необязательно, TTS-модель" }` | `audio/wav` |
+| POST | `/api/tts` | `{ "text": "...", "voice": "Kore", "language": "необязательно, напр. ru-RU" }` | `audio/wav` |
 
 Если задана переменная `APP_API_KEY`, все `/api/*` требуют заголовок `X-App-Key: <ключ>`.
 
-## Устойчивость к перегрузке Gemini
+## Озвучка: Cloud TTS с запасным Gemini
+
+Основной движок — **Google Cloud Text-to-Speech**, семейство голосов Chirp 3 HD.
+Имена голосов там те же, что у Gemini TTS (Kore, Puck, Zephyr, Charon, Fenrir,
+Aoede, Leda, Orus), поэтому клиент о смене движка не знает.
+
+Причина перехода — квоты. У Gemini TTS на бесплатном тарифе 3 запроса в минуту и
+около десятка в сутки; у Cloud TTS бесплатная квота считается символами: 1 млн в
+месяц на Chirp 3 HD (это примерно 1000 озвучек по 1000 символов), плюс отдельно
+1 млн на WaveNet и 4 млн на Standard. Цена сверх квоты — $30 за 1 млн символов.
+
+Движок включается наличием `GOOGLE_TTS_API_KEY`; без ключа озвучка остаётся на
+Gemini. Если Cloud TTS ответил ошибкой (кроме 400 — это наша же невалидная
+просьба), запрос повторяется через Gemini: месячная квота может закончиться, и
+доработать месяц на запасном движке лучше, чем отдавать пользователю ошибку.
+
+Язык Cloud TTS, в отличие от Gemini, сам не определяет — его задаёт имя голоса.
+Бэкенд выбирает локаль по тексту: есть кириллица → `ru-RU`, иначе `en-US`.
+Явно язык можно передать полем `language`.
+
+Предел одного запроса — 5000 **байт**, а не символов: кириллица в UTF-8 занимает
+два байта, так что это около 2400 знаков русского текста.
+
+## Устойчивость к перегрузке Gemini: перефразировка
 
 Бесплатный тариф отвечает `503 high demand` при перегрузке модели и `429` при
 исчерпании квоты (она у каждой модели своя и невелика — у части моделей это
@@ -40,7 +65,7 @@
 ## Локальный запуск
 
 ```bash
-cp .env.example .env   # вписать GEMINI_API_KEY
+cp .env.example .env   # вписать GOOGLE_TTS_API_KEY и GEMINI_API_KEY
 npm install
 node --env-file=.env --watch src/server.js
 ```
@@ -54,6 +79,7 @@ curl -X POST http://localhost:3000/api/paraphrase -H "Content-Type: application/
 ## Деплой на Railway
 
 1. Запушить репозиторий на GitHub, в Railway: **New Project → Deploy from GitHub repo**.
-2. В **Variables** добавить `GEMINI_API_KEY` (и при желании `APP_API_KEY`).
+2. В **Variables** добавить `GOOGLE_TTS_API_KEY` (озвучка), `GEMINI_API_KEY` (перефразировка)
+   и при желании `GROQ_API_KEY`, `APP_API_KEY`.
 3. Railway сам определит Node.js, соберёт и запустит `npm start`; `PORT` подставляется автоматически.
 4. В **Settings → Networking → Generate Domain** получить публичный URL — его вписать в Flutter-приложение.
